@@ -1,6 +1,9 @@
 # BazMap Changelog
 
-## 5 - BazCore Migration
+## 006
+- License changed to GPL v2 (consistent with Baz Suite)
+
+## 005 - BazCore Migration
 - Migrated to BazCore framework (profiles, settings panel, minimap button)
 - Fixed mode detection: M now correctly opens map mode, L opens quest log mode
 - Deferred mode detection to next frame for reliable QuestMapFrame state

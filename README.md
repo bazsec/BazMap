@@ -7,8 +7,8 @@
 
 <p align="center">
   <img src="https://img.shields.io/badge/WoW-12.0%20Midnight-blue" alt="WoW Version"/>
-  <img src="https://img.shields.io/badge/License-GPL%20v3-green" alt="License"/>
-  <img src="https://img.shields.io/badge/Version-005-orange" alt="Version"/>
+  <img src="https://img.shields.io/badge/License-GPL%20v2-green" alt="License"/>
+  <img src="https://img.shields.io/badge/Version-006-orange" alt="Version"/>
 </p>
 
 ---
@@ -61,7 +61,7 @@ Open via `/bazmap` or WoW Settings > AddOns > BazMap.
 
 ## License
 
-BazMap is licensed under the [GNU General Public License v3](LICENSE) (GPL v3).
+BazMap is licensed under the [GNU General Public License v2](LICENSE) (GPL v2).
 
 ---
 
