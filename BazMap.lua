@@ -1,0 +1,450 @@
+-- BazMap - A World of Warcraft Addon
+-- Copyright (C) 2025 Baz4k
+-- Licensed under GPLv3
+
+local ADDON_NAME = "BazMap"
+
+---------------------------------------------------------------------------
+-- BazCore Registration
+---------------------------------------------------------------------------
+
+local addon
+addon = BazCore:RegisterAddon(ADDON_NAME, {
+    title = "BazMap",
+    savedVariable = "BazMapDB",
+    profiles = true,
+    defaults = {
+        mapScale       = 100,
+        mapDraggable   = true,
+        questScale     = 100,
+        questDraggable = true,
+        clampToScreen  = true,
+    },
+
+    slash = { "/bazmap", "/bmap" },
+    commands = {
+        reset = {
+            desc = "Reset all positions to defaults",
+            handler = function()
+                addon:SetSetting("mapPosition", nil)
+                addon:SetSetting("questPosition", nil)
+                addon:Print("Positions reset.")
+            end,
+        },
+    },
+
+    minimap = {
+        label = "BazMap",
+        icon = "Interface\\AddOns\\BazMap\\icon.png",
+    },
+})
+
+-- db proxy
+local dbProxy = {}
+local profileProxy = setmetatable({}, {
+    __index = function(_, key)
+        local sv = _G["BazMapDB"]
+        if not sv then return nil end
+        local profileName = BazCore:GetActiveProfile(ADDON_NAME)
+        local profile = sv.profiles and sv.profiles[profileName]
+        if profile then return profile[key] end
+        return nil
+    end,
+    __newindex = function(_, key, value)
+        local sv = _G["BazMapDB"]
+        if not sv then return end
+        local profileName = BazCore:GetActiveProfile(ADDON_NAME)
+        if not sv.profiles then sv.profiles = {} end
+        if not sv.profiles[profileName] then sv.profiles[profileName] = {} end
+        sv.profiles[profileName][key] = value
+    end,
+})
+dbProxy.profile = profileProxy
+addon.db = dbProxy
+
+function addon:GetSetting(key)
+    return self.db.profile[key]
+end
+
+function addon:SetSetting(key, value)
+    self.db.profile[key] = value
+end
+
+---------------------------------------------------------------------------
+-- State
+---------------------------------------------------------------------------
+
+local initialized = false
+
+---------------------------------------------------------------------------
+-- Mode detection
+---------------------------------------------------------------------------
+
+local lastKnownMode = "map"
+
+local function GetCurrentMode()
+    if QuestMapFrame and QuestMapFrame:IsShown() then
+        lastKnownMode = "quest"
+        return "quest"
+    end
+    lastKnownMode = "map"
+    return "map"
+end
+
+local function GetModeKey(suffix)
+    return GetCurrentMode() .. suffix
+end
+
+local function GetModeScale()
+    return addon:GetSetting(GetModeKey("Scale")) or 100
+end
+
+local function GetModeDraggable()
+    return addon:GetSetting(GetModeKey("Draggable")) ~= false
+end
+
+---------------------------------------------------------------------------
+-- Position
+---------------------------------------------------------------------------
+
+function addon:SavePosition()
+    if not WorldMapFrame then return end
+    -- Use lastKnownMode so we save to the right key even during Hide when QuestMapFrame is already gone
+    local mode = lastKnownMode
+    if not addon:GetSetting(mode .. "Draggable") then return end
+    local point, _, relativePoint, x, y = WorldMapFrame:GetPoint()
+    if point then
+        addon:SetSetting(mode .. "Position", { point = point, relativePoint = relativePoint, x = x, y = y })
+    end
+end
+
+function addon:LoadPosition()
+    if not WorldMapFrame then return end
+    WorldMapFrame:ClearAllPoints()
+    local pos = addon:GetSetting(GetModeKey("Position"))
+    if GetModeDraggable() and pos then
+        WorldMapFrame:SetPoint(pos.point, UIParent, pos.relativePoint, pos.x, pos.y)
+    elseif GetCurrentMode() == "quest" then
+        WorldMapFrame:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
+    else
+        WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+    end
+end
+
+---------------------------------------------------------------------------
+-- Scaling
+---------------------------------------------------------------------------
+
+function addon:ApplyScale()
+    if not WorldMapFrame then return end
+
+    -- Get native windowed size at scale 1
+    WorldMapFrame:SetScale(1)
+    local nativeW, nativeH = WorldMapFrame:GetSize()
+    if nativeW == 0 or nativeH == 0 then return end
+
+    local pct = GetModeScale() / 100
+
+    -- Cap to screen
+    local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
+    local maxPct = math.min(screenW / nativeW, screenH / nativeH)
+    if pct > maxPct then
+        pct = maxPct
+        addon:SetSetting(GetModeKey("Scale"), math.floor(pct * 100 + 0.5))
+    end
+
+    -- Use SetScale — Blizzard handles overlay repositioning internally
+    WorldMapFrame:SetScale(pct)
+
+    -- Notify the map to refresh pin positions
+    if WorldMapFrame.OnFrameSizeChanged then
+        WorldMapFrame:OnFrameSizeChanged()
+    end
+end
+
+---------------------------------------------------------------------------
+-- Apply all settings
+---------------------------------------------------------------------------
+
+function addon:ApplyAll()
+    if not WorldMapFrame or not WorldMapFrame:IsShown() then return end
+    self:ApplyScale()
+    self:LoadPosition()
+    WorldMapFrame:SetMovable(GetModeDraggable())
+    WorldMapFrame:SetClampedToScreen(self:GetSetting("clampToScreen") ~= false)
+end
+
+---------------------------------------------------------------------------
+-- Init
+---------------------------------------------------------------------------
+
+local function InitMap()
+    if initialized then return end
+    if not WorldMapFrame then return end
+    initialized = true
+
+    -- Remove Blizzard's panel layout management (delayed like Leatrix)
+    C_Timer.After(0.1, function()
+        WorldMapFrame:SetAttribute("UIPanelLayout-area", nil)
+        WorldMapFrame:SetAttribute("UIPanelLayout-enabled", false)
+        WorldMapFrame:SetAttribute("UIPanelLayout-allowOtherPanels", true)
+    end)
+
+    -- Hide blackout overlay
+    if WorldMapFrame.BlackoutFrame then
+        WorldMapFrame.BlackoutFrame:Hide()
+        WorldMapFrame.BlackoutFrame:SetAlpha(0)
+        WorldMapFrame.BlackoutFrame:SetScript("OnShow", function(self) self:Hide() end)
+    end
+
+    -- Hide tiled background that extends beyond the map
+    local scrollChild = WorldMapFrame.ScrollContainer and WorldMapFrame.ScrollContainer.Child
+    if scrollChild and scrollChild.TiledBackground then
+        scrollChild.TiledBackground:Hide()
+        scrollChild.TiledBackground:SetScript("OnShow", function(self) self:Hide() end)
+    end
+
+    -- Make draggable via title bar
+    WorldMapFrame:SetMovable(true)
+    WorldMapFrame:EnableMouse(true)
+    WorldMapFrame:RegisterForDrag("LeftButton")
+
+    local titleBar = WorldMapFrame.BorderFrame and WorldMapFrame.BorderFrame.TitleContainer
+    if titleBar then
+        titleBar:HookScript("OnMouseDown", function(_, button)
+            if button == "LeftButton" and GetModeDraggable() then
+                WorldMapFrame:StartMoving()
+            end
+        end)
+        titleBar:HookScript("OnMouseUp", function(_, button)
+            if button == "LeftButton" and GetModeDraggable() then
+                WorldMapFrame:StopMovingOrSizing()
+                addon:SavePosition()
+            end
+        end)
+    end
+
+    -- Hook SynchronizeDisplayState to re-apply after Blizzard state changes
+    hooksecurefunc(WorldMapFrame, "SynchronizeDisplayState", function()
+        if WorldMapFrame:IsShown() then
+            addon:ApplyAll()
+        end
+    end)
+
+    -- Hook Show to apply settings immediately
+    hooksecurefunc(WorldMapFrame, "Show", function()
+        addon:ApplyAll()
+    end)
+
+    -- Hook Hide to save position
+    hooksecurefunc(WorldMapFrame, "Hide", function()
+        addon:SavePosition()
+    end)
+
+    -- Mode changes while open
+    if QuestMapFrame then
+        hooksecurefunc(QuestMapFrame, "Show", function()
+            if WorldMapFrame:IsShown() then
+                lastKnownMode = "quest"
+                addon:ApplyAll()
+            end
+        end)
+        hooksecurefunc(QuestMapFrame, "Hide", function()
+            if WorldMapFrame:IsShown() then
+                -- Save quest position before switching to map mode
+                addon:SavePosition()
+                lastKnownMode = "map"
+                addon:ApplyAll()
+            end
+        end)
+    end
+
+    -- Resize handle
+    local resizer = CreateFrame("Button", nil, WorldMapFrame)
+    resizer:SetSize(16, 16)
+    resizer:SetPoint("BOTTOMRIGHT", WorldMapFrame.BorderFrame or WorldMapFrame, "BOTTOMRIGHT", -1, 1)
+    resizer:SetFrameStrata("TOOLTIP")
+    resizer:SetFrameLevel(999)
+    resizer:EnableMouse(true)
+    resizer:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
+    resizer:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
+    resizer:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
+
+    local startX, startY, startScale
+    resizer:SetScript("OnMouseDown", function(self, button)
+        if button ~= "LeftButton" then return end
+        startX, startY = GetCursorPosition()
+        startScale = GetModeScale()
+        self:SetScript("OnUpdate", function()
+            local cx, cy = GetCursorPosition()
+            local delta = ((cx - startX) + (startY - cy)) / 4
+            local w, h = WorldMapFrame:GetSize()
+            local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
+            local maxPct = (w > 0 and h > 0) and math.floor(math.min(screenW / w, screenH / h) * 100) or 150
+            local newScale = math.max(30, math.min(maxPct, math.floor(startScale + delta + 0.5)))
+            addon:SetSetting(GetModeKey("Scale"), newScale)
+            addon:ApplyScale()
+        end)
+    end)
+    resizer:SetScript("OnMouseUp", function(self)
+        self:SetScript("OnUpdate", nil)
+    end)
+
+    -- Screen resize
+    UIParent:HookScript("OnSizeChanged", function()
+        if WorldMapFrame:IsShown() then addon:ApplyScale() end
+    end)
+
+    -- BlizzMove compatibility
+    if C_AddOns.IsAddOnLoaded("BlizzMove") then
+        C_Timer.After(0.5, function()
+            if BlizzMove and BlizzMove.DisableFrame then
+                pcall(function() BlizzMove:DisableFrame("Blizzard_WorldMap", "WorldMapFrame") end)
+                pcall(function() BlizzMove:DisableFrame("BlizzMove", "WorldMapFrame") end)
+            end
+        end)
+    end
+end
+
+---------------------------------------------------------------------------
+-- Bootstrap
+---------------------------------------------------------------------------
+
+local bootstrap = CreateFrame("Frame")
+bootstrap:RegisterEvent("ADDON_LOADED")
+bootstrap:SetScript("OnEvent", function(self, _, loadedAddon)
+    if loadedAddon == "Blizzard_WorldMap" then
+        self:UnregisterEvent("ADDON_LOADED")
+        C_Timer.After(0, function()
+            InitMap()
+            if WorldMapFrame and WorldMapFrame:IsShown() then
+                addon:ApplyAll()
+            end
+        end)
+    end
+end)
+
+if C_AddOns.IsAddOnLoaded("Blizzard_WorldMap") and WorldMapFrame then
+    InitMap()
+end
+
+---------------------------------------------------------------------------
+-- Options (BazCore OptionsPanel)
+---------------------------------------------------------------------------
+
+local function GetOptionsTable()
+    return {
+        name = "BazMap",
+        subtitle = "Resizable map and quest log window",
+        type = "group",
+        args = {
+            mapHeader = {
+                order = 1,
+                type = "header",
+                name = "Map Mode",
+            },
+            mapScale = {
+                order = 2,
+                type = "range",
+                name = "Map Size",
+                min = 30, max = 150, step = 5,
+                get = function() return addon:GetSetting("mapScale") or 100 end,
+                set = function(_, val)
+                    addon:SetSetting("mapScale", val)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "map" then
+                        addon:ApplyScale()
+                    end
+                end,
+            },
+            mapDraggable = {
+                order = 3,
+                type = "toggle",
+                name = "Enable Dragging (Map)",
+                get = function() return addon:GetSetting("mapDraggable") ~= false end,
+                set = function(_, val)
+                    addon:SetSetting("mapDraggable", val)
+                    if WorldMapFrame and GetCurrentMode() == "map" then
+                        WorldMapFrame:SetMovable(val)
+                        if not val then addon:LoadPosition() end
+                    end
+                end,
+            },
+            resetMap = {
+                order = 4,
+                type = "execute",
+                name = "Reset Map Position",
+                func = function()
+                    addon:SetSetting("mapPosition", nil)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "map" then
+                        addon:LoadPosition()
+                    end
+                    addon:Print("Map position reset.")
+                end,
+            },
+            clampToScreen = {
+                order = 5,
+                type = "toggle",
+                name = "Clamp to Screen",
+                get = function() return addon:GetSetting("clampToScreen") ~= false end,
+                set = function(_, val)
+                    addon:SetSetting("clampToScreen", val)
+                    if WorldMapFrame then WorldMapFrame:SetClampedToScreen(val) end
+                end,
+            },
+
+            questHeader = {
+                order = 10,
+                type = "header",
+                name = "Quest Log Mode",
+            },
+            questScale = {
+                order = 11,
+                type = "range",
+                name = "Quest Log Size",
+                min = 30, max = 150, step = 5,
+                get = function() return addon:GetSetting("questScale") or 100 end,
+                set = function(_, val)
+                    addon:SetSetting("questScale", val)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "quest" then
+                        addon:ApplyScale()
+                    end
+                end,
+            },
+            questDraggable = {
+                order = 12,
+                type = "toggle",
+                name = "Enable Dragging (Quest Log)",
+                get = function() return addon:GetSetting("questDraggable") ~= false end,
+                set = function(_, val)
+                    addon:SetSetting("questDraggable", val)
+                    if WorldMapFrame and GetCurrentMode() == "quest" then
+                        WorldMapFrame:SetMovable(val)
+                        if not val then addon:LoadPosition() end
+                    end
+                end,
+            },
+            resetQuest = {
+                order = 13,
+                type = "execute",
+                name = "Reset Quest Log Position",
+                func = function()
+                    addon:SetSetting("questPosition", nil)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "quest" then
+                        addon:LoadPosition()
+                    end
+                    addon:Print("Quest log position reset.")
+                end,
+            },
+        },
+    }
+end
+
+addon.config.onLoad = function(self)
+    BazCore:RegisterOptionsTable(ADDON_NAME, GetOptionsTable)
+    BazCore:AddToSettings(ADDON_NAME, "BazMap")
+
+    BazCore:RegisterOptionsTable(ADDON_NAME .. "-Profiles", function()
+        return BazCore:GetProfileOptionsTable(ADDON_NAME)
+    end)
+    BazCore:AddToSettings(ADDON_NAME .. "-Profiles", "Profiles", ADDON_NAME)
+end
