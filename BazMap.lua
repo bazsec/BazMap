@@ -138,6 +138,15 @@ end
 function addon:ApplyScale()
     if not WorldMapFrame then return end
 
+    -- Capture top-left position before scaling (anchor point for resize)
+    local left = WorldMapFrame:GetLeft()
+    local top = WorldMapFrame:GetTop()
+    local oldScale = WorldMapFrame:GetScale()
+    if left and top then
+        left = left * oldScale
+        top = top * oldScale
+    end
+
     -- Get native windowed size at scale 1
     WorldMapFrame:SetScale(1)
     local nativeW, nativeH = WorldMapFrame:GetSize()
@@ -153,8 +162,13 @@ function addon:ApplyScale()
         addon:SetSetting(GetModeKey("Scale"), math.floor(pct * 100 + 0.5))
     end
 
-    -- Use SetScale — Blizzard handles overlay repositioning internally
     WorldMapFrame:SetScale(pct)
+
+    -- Re-anchor to TOPLEFT so resizing grows downward-right (handle stays with cursor)
+    if left and top then
+        WorldMapFrame:ClearAllPoints()
+        WorldMapFrame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", left / pct, top / pct)
+    end
 
     -- Notify the map to refresh pin positions
     if WorldMapFrame.OnFrameSizeChanged then
@@ -259,36 +273,15 @@ local function InitMap()
         end)
     end
 
-    -- Resize handle
-    local resizer = CreateFrame("Button", nil, WorldMapFrame)
-    resizer:SetSize(16, 16)
-    resizer:SetPoint("BOTTOMRIGHT", WorldMapFrame.BorderFrame or WorldMapFrame, "BOTTOMRIGHT", -1, 1)
-    resizer:SetFrameStrata("TOOLTIP")
-    resizer:SetFrameLevel(999)
-    resizer:EnableMouse(true)
-    resizer:SetNormalTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Up")
-    resizer:SetHighlightTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Highlight")
-    resizer:SetPushedTexture("Interface\\ChatFrame\\UI-ChatIM-SizeGrabber-Down")
-
-    local startX, startY, startScale
-    resizer:SetScript("OnMouseDown", function(self, button)
-        if button ~= "LeftButton" then return end
-        startX, startY = GetCursorPosition()
-        startScale = GetModeScale()
-        self:SetScript("OnUpdate", function()
-            local cx, cy = GetCursorPosition()
-            local delta = ((cx - startX) + (startY - cy)) / 4
-            local w, h = WorldMapFrame:GetSize()
-            local screenW, screenH = UIParent:GetWidth(), UIParent:GetHeight()
-            local maxPct = (w > 0 and h > 0) and math.floor(math.min(screenW / w, screenH / h) * 100) or 150
-            local newScale = math.max(30, math.min(maxPct, math.floor(startScale + delta + 0.5)))
-            addon:SetSetting(GetModeKey("Scale"), newScale)
+    -- Resize handle (via BazCore)
+    BazCore:MakeResizable(WorldMapFrame, {
+        parent = WorldMapFrame.BorderFrame or WorldMapFrame,
+        getScale = GetModeScale,
+        setScale = function(pct)
+            addon:SetSetting(GetModeKey("Scale"), pct)
             addon:ApplyScale()
-        end)
-    end)
-    resizer:SetScript("OnMouseUp", function(self)
-        self:SetScript("OnUpdate", nil)
-    end)
+        end,
+    })
 
     -- Screen resize
     UIParent:HookScript("OnSizeChanged", function()

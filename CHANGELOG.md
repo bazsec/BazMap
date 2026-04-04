@@ -1,6 +1,7 @@
 # BazMap Changelog
 
-## 006
+## 007
+- Resize handle now uses BazCore:MakeResizable() shared utility
 - License changed to GPL v2 (consistent with Baz Suite)
 
 ## 005 - BazCore Migration
