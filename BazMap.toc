@@ -23,5 +23,6 @@
 ## Author: Baz4k
 ## License: GPLv3
 ## Dependencies: BazCore
+## X-Curse-Project-ID: 1404160
 
 BazMap.lua
