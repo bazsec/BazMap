@@ -1,5 +1,8 @@
 # BazMap Changelog
 
+## 008
+- Version bump to re-trigger CurseForge upload
+
 ## 007
 - Resize handle now uses BazCore:MakeResizable() shared utility
 - License changed to GPL v2 (consistent with Baz Suite)
