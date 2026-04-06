@@ -5,6 +5,8 @@
 
 ## 007
 - Resize handle now uses BazCore:MakeResizable() shared utility
+
+## 006
 - License changed to GPL v2 (consistent with Baz Suite)
 
 ## 005 - BazCore Migration
