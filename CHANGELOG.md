@@ -1,5 +1,8 @@
 # BazMap Changelog
 
+## 009
+- Category changed to "Baz Suite"
+
 ## 008
 - Version bump to re-trigger CurseForge upload
 

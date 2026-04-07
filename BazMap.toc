@@ -1,11 +1,12 @@
 ## Interface: 120001
-## Version: 008
+## Version: 009
 ## Title: BazMap
 ## IconTexture: Interface\AddOns\BazMap\icon.png
 ## Notes: Resizable map and quest log window with independent settings per mode
 ## SavedVariables: BazMapDB
 ## Author: Baz4k
 ## X-License: GPL v2
+## Category: Baz Suite
 ## Dependencies: BazCore
 ## X-Curse-Project-ID: 1404160
 
