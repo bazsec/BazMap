@@ -1,5 +1,9 @@
 # BazMap Changelog
 
+## 012 - Unified Profiles
+- Profiles now managed centrally in BazCore settings
+- Removed per-addon Profiles subcategory
+
 ## 009
 - Category changed to "Baz Suite"
 
