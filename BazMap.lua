@@ -38,36 +38,7 @@ addon = BazCore:RegisterAddon(ADDON_NAME, {
     },
 })
 
--- db proxy
-local dbProxy = {}
-local profileProxy = setmetatable({}, {
-    __index = function(_, key)
-        local sv = _G["BazMapDB"]
-        if not sv then return nil end
-        local profileName = BazCore:GetActiveProfile(ADDON_NAME)
-        local profile = sv.profiles and sv.profiles[profileName]
-        if profile then return profile[key] end
-        return nil
-    end,
-    __newindex = function(_, key, value)
-        local sv = _G["BazMapDB"]
-        if not sv then return end
-        local profileName = BazCore:GetActiveProfile(ADDON_NAME)
-        if not sv.profiles then sv.profiles = {} end
-        if not sv.profiles[profileName] then sv.profiles[profileName] = {} end
-        sv.profiles[profileName][key] = value
-    end,
-})
-dbProxy.profile = profileProxy
-addon.db = dbProxy
-
-function addon:GetSetting(key)
-    return self.db.profile[key]
-end
-
-function addon:SetSetting(key, value)
-    self.db.profile[key] = value
-end
+-- addon.db is auto-wired by BazCore:CreateDBProxy() in RegisterAddon
 
 ---------------------------------------------------------------------------
 -- State
