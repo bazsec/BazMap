@@ -1,5 +1,8 @@
 # BazMap Changelog
 
+## 013 - Icon Update
+- Changed addon panel icon to inv_misc_map_01
+
 ## 012 - Unified Profiles
 - Profiles now managed centrally in BazCore settings
 - Removed per-addon Profiles subcategory
