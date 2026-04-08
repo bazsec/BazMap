@@ -35,7 +35,6 @@ addon = BazCore:RegisterAddon(ADDON_NAME, {
 
     minimap = {
         label = "BazMap",
-        icon = "Interface\\AddOns\\BazMap\\icon.png",
     },
 })
 
@@ -325,10 +324,26 @@ end
 -- Options (BazCore OptionsPanel)
 ---------------------------------------------------------------------------
 
-local function GetOptionsTable()
+local function GetLandingPage()
+    return BazCore:CreateLandingPage("BazMap", {
+        subtitle = "Resizable map and quest log",
+        description = "A resizable map and quest log window with independent settings per mode. " ..
+            "Press M for the map, L for the quest log — each remembers its own size and position.",
+        features = "Independent scale and position for map and quest log modes. " ..
+            "Drag to resize via BazCore handle. " ..
+            "Draggable and clamp-to-screen per mode. " ..
+            "Replaces Blizzard's fullscreen map with a clean windowed experience.",
+        guide = {
+            { "Map", "Press M to open the map in a resizable window" },
+            { "Quest Log", "Press L to open the quest log — separate position and size" },
+            { "Resize", "Drag the handle at the bottom-right corner" },
+        },
+    })
+end
+
+local function GetSettingsPage()
     return {
-        name = "BazMap",
-        subtitle = "Resizable map and quest log window",
+        name = "Settings",
         type = "group",
         args = {
             mapHeader = {
@@ -433,8 +448,11 @@ local function GetOptionsTable()
 end
 
 addon.config.onLoad = function(self)
-    BazCore:RegisterOptionsTable(ADDON_NAME, GetOptionsTable)
+    BazCore:RegisterOptionsTable(ADDON_NAME, GetLandingPage)
     BazCore:AddToSettings(ADDON_NAME, "BazMap")
+
+    BazCore:RegisterOptionsTable(ADDON_NAME .. "-Settings", GetSettingsPage)
+    BazCore:AddToSettings(ADDON_NAME .. "-Settings", "Settings", ADDON_NAME)
 
     BazCore:RegisterOptionsTable(ADDON_NAME .. "-Profiles", function()
         return BazCore:GetProfileOptionsTable(ADDON_NAME)
