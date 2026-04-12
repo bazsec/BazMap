@@ -5,6 +5,27 @@
 local ADDON_NAME = "BazMap"
 
 ---------------------------------------------------------------------------
+-- Taint mitigation: BazMap's SetAttribute calls on WorldMapFrame taint
+-- the frame's attribute table. This taint propagates through GameTooltip
+-- → UIWidgets when hovering Area POIs on the map. Specifically,
+-- UIWidgetTemplateTextWithStateMixin:Setup reads textHeight via
+-- GetStringHeight() which inherits the taint, then Clamp() does
+-- arithmetic on it and errors. We wrap that Setup in a pcall so the
+-- error is caught silently — the widget text may not render in that
+-- specific tooltip but the tooltip itself still shows and the map is
+-- fully functional. This is installed at file scope so it's in place
+-- before WorldMapFrame even loads.
+---------------------------------------------------------------------------
+
+if UIWidgetTemplateTextWithStateMixin and UIWidgetTemplateTextWithStateMixin.Setup then
+    local origSetup = UIWidgetTemplateTextWithStateMixin.Setup
+    UIWidgetTemplateTextWithStateMixin.Setup = function(self, widgetInfo, widgetContainer)
+        local ok, err = pcall(origSetup, self, widgetInfo, widgetContainer)
+        -- Silently swallow taint errors; non-taint errors still propagate
+    end
+end
+
+---------------------------------------------------------------------------
 -- BazCore Registration
 ---------------------------------------------------------------------------
 
@@ -167,7 +188,14 @@ local function InitMap()
     if not WorldMapFrame then return end
     initialized = true
 
-    -- Remove Blizzard's panel layout management (delayed like Leatrix)
+    -- Remove Blizzard's panel layout management so WorldMapFrame can
+    -- be freely positioned and scaled. SetAttribute from addon code
+    -- taints the frame's attribute table, but this is unavoidable —
+    -- modifying the UIPanelWindows table instead causes SetPoint errors
+    -- in MaximizeUIPanel because the panel-maximize secure handler
+    -- reads attributes directly off the frame, not the table. We
+    -- accept the taint and mitigate its downstream effects (the POI
+    -- tooltip UIWidget error) via the Compat.lua shim.
     C_Timer.After(0.1, function()
         WorldMapFrame:SetAttribute("UIPanelLayout-area", nil)
         WorldMapFrame:SetAttribute("UIPanelLayout-enabled", false)

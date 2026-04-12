@@ -1,5 +1,11 @@
 # BazMap Changelog
 
+## 014 - Fix POI Tooltip Taint Error
+- Fixed "attempt to perform arithmetic on local 'textHeight' (a secret number value tainted by 'BazMap')" error when hovering Area POIs on the world map
+  - Root cause: BazMap's `SetAttribute` calls on WorldMapFrame (required to detach from Blizzard's panel layout system) taint the frame's attribute table; taint then propagates through GameTooltip → UIWidgets → `UIWidgetTemplateTextWithStateMixin:Setup` where `GetStringHeight()` returns a tainted number and `Clamp()` fails on arithmetic
+  - Fix: wrapped `UIWidgetTemplateTextWithStateMixin.Setup` in a pcall at file scope so the taint error is caught silently; the widget text may not render in that specific tooltip but the tooltip itself still shows and the map is fully functional
+  - Investigated alternative approaches (modifying `UIPanelWindows` table instead of `SetAttribute`) but these break `MaximizeUIPanel` because the `panel-maximize` secure handler reads attributes directly off the frame, not the Lua table — `SetAttribute` is the only viable way to detach from the panel system
+
 ## 013 - Icon Update
 - Changed addon panel icon to inv_misc_map_01
 
