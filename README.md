@@ -1,68 +1,64 @@
-<h1 align="center">BazMap</h1>
+> **Warning: Requires [BazCore](https://www.curseforge.com/wow/addons/bazcore).** If you use the CurseForge app, it will be installed automatically. Manual users must install BazCore separately.
 
-<p align="center">
-  <strong>Resizable map and quest log window for World of Warcraft</strong><br/>
-  Independent scale, position, and drag settings for map and quest log modes.
-</p>
+# BazMap
 
-<p align="center">
-  <img src="https://img.shields.io/badge/WoW-12.0%20Midnight-blue" alt="WoW Version"/>
-  <img src="https://img.shields.io/badge/License-GPL%20v2-green" alt="License"/>
-  <img src="https://img.shields.io/github/v/tag/bazsec/BazMap?label=Version&color=orange" alt="Version"/>
-</p>
+![WoW](https://img.shields.io/badge/WoW-12.0_Midnight-blue) ![License](https://img.shields.io/badge/License-GPL_v2-green) ![Version](https://img.shields.io/github/v/tag/bazsec/BazMap?label=Version&color=orange)
 
----
+A resizable map and quest log window with independent settings per mode.
 
-## What is BazMap?
+BazMap detaches the World Map from Blizzard's panel system and turns it into a freely resizable, repositionable window. Map mode and quest log mode each remember their own size and position independently, so you can have a large map for exploration and a compact quest log for tracking - without one resetting the other.
 
-BazMap gives you full control over the World Map and Quest Log windows. Scale them to any size, drag them anywhere on screen, and save independent positions for map mode vs quest log mode. Includes a drag-to-resize handle for quick visual resizing.
-
----
+***
 
 ## Features
 
-- **Resizable** — drag handle on bottom-right corner, or set scale in settings
-- **Draggable** — drag the title bar to reposition
-- **Dual mode** — independent scale and position for Map vs Quest Log
-- **Position persistence** — remembers where you put each mode
-- **Screen clamping** — optional, prevents dragging off-screen
-- **Profile support** — per-character settings via BazCore
+*   **Freely resizable** World Map window - drag the edges to any size you want
+*   **Independent layouts per mode** - map mode and quest log mode each save their own size and position
+*   **Detached from Blizzard's panel system** - the map no longer pushes other frames around
+*   **Repositionable** - drag the map anywhere on screen
+*   **Profile support** for per-character settings via BazCore
 
----
-
-## Settings
-
-Open via `/bazmap` or WoW Settings > AddOns > BazMap.
-
-| Setting | Description |
-|---------|-------------|
-| Map Size | Scale for map mode (30-150%) |
-| Enable Dragging (Map) | Allow repositioning in map mode |
-| Quest Log Size | Scale for quest log mode (30-150%) |
-| Enable Dragging (Quest Log) | Allow repositioning in quest log mode |
-| Clamp to Screen | Prevent window from going off-screen |
-
----
+***
 
 ## Slash Commands
 
 | Command | Description |
-|---------|-------------|
+| --- | --- |
 | `/bazmap` | Open settings panel |
-| `/bazmap reset` | Reset all positions to defaults |
 
----
+***
 
-## Requirements
+## Compatibility
 
-- **BazCore** — shared framework (install alongside this addon)
+*   **WoW Version:** Retail 12.0 (Midnight)
+*   **Midnight API Safe:** Uses pcall wrapper for UIWidget taint from SetAttribute calls
+*   **Edit Mode:** Compatible - map window is independent of Edit Mode layout
 
----
+***
+
+## Dependencies
+
+**Required:**
+
+*   [BazCore](https://www.curseforge.com/wow/addons/bazcore) - shared framework for Baz Suite addons
+
+***
+
+## Part of the Baz Suite
+
+BazMap is part of the **Baz Suite** of addons, all built on the [BazCore](https://www.curseforge.com/wow/addons/bazcore) framework:
+
+*   **[BazBars](https://www.curseforge.com/wow/addons/bazbars)** - Custom extra action bars
+*   **[BazWidgetDrawers](https://www.curseforge.com/wow/addons/bazwidgetdrawers)** - Slide-out widget drawer
+*   **[BazWidgets](https://www.curseforge.com/wow/addons/bazwidgets)** - Widget pack for BazWidgetDrawers
+*   **[BazNotificationCenter](https://www.curseforge.com/wow/addons/baznotificationcenter)** - Toast notification system
+*   **[BazLootNotifier](https://www.curseforge.com/wow/addons/bazlootnotifier)** - Animated loot popups
+*   **[BazFlightZoom](https://www.curseforge.com/wow/addons/bazflightzoom)** - Auto zoom on flying mounts
+*   **[BazMap](https://www.curseforge.com/wow/addons/bazmap)** - Resizable map and quest log window
+*   **[BazMapPortals](https://www.curseforge.com/wow/addons/bazmapportals)** - Mage portal/teleport map pins
+
+***
 
 ## License
 
-BazMap is licensed under the [GNU General Public License v2](LICENSE) (GPL v2).
-
----
-
-<sub>Built by <strong>Baz4k</strong></sub>
+BazMap is licensed under the **GNU General Public License v2** (GPL v2).
