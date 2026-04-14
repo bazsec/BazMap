@@ -345,6 +345,11 @@ local function GetSettingsPage()
         name = "Settings",
         type = "group",
         args = {
+            intro = {
+                order = 0.1,
+                type = "lead",
+                text = "Map mode and quest log mode each save their own size and position. Adjust the two layouts independently below.",
+            },
             mapHeader = {
                 order = 1,
                 type = "header",

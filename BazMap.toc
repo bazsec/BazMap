@@ -1,5 +1,5 @@
 ## Interface: 120001
-## Version: 014
+## Version: 016
 ## Title: BazMap
 ## IconTexture: interface\icons\inv_misc_map_01
 ## Notes: Resizable map and quest log window with independent settings per mode
@@ -11,3 +11,5 @@
 ## X-Curse-Project-ID: 1404160
 
 BazMap.lua
+
+UserGuide.lua
