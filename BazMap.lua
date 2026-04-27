@@ -7,11 +7,11 @@ local ADDON_NAME = "BazMap"
 ---------------------------------------------------------------------------
 -- Taint mitigation: BazMap's SetAttribute calls on WorldMapFrame taint
 -- the frame's attribute table. This taint propagates through GameTooltip
--- → UIWidgets when hovering Area POIs on the map. Specifically,
+-- > UIWidgets when hovering Area POIs on the map. Specifically,
 -- UIWidgetTemplateTextWithStateMixin:Setup reads textHeight via
 -- GetStringHeight() which inherits the taint, then Clamp() does
 -- arithmetic on it and errors. We wrap that Setup in a pcall so the
--- error is caught silently — the widget text may not render in that
+-- error is caught silently - the widget text may not render in that
 -- specific tooltip but the tooltip itself still shows and the map is
 -- fully functional. This is installed at file scope so it's in place
 -- before WorldMapFrame even loads.
@@ -190,7 +190,7 @@ local function InitMap()
 
     -- Remove Blizzard's panel layout management so WorldMapFrame can
     -- be freely positioned and scaled. SetAttribute from addon code
-    -- taints the frame's attribute table, but this is unavoidable —
+    -- taints the frame's attribute table, but this is unavoidable -
     -- modifying the UIPanelWindows table instead causes SetPoint errors
     -- in MaximizeUIPanel because the panel-maximize secure handler
     -- reads attributes directly off the frame, not the table. We
@@ -327,14 +327,14 @@ local function GetLandingPage()
     return BazCore:CreateLandingPage("BazMap", {
         subtitle = "Resizable map and quest log",
         description = "A resizable map and quest log window with independent settings per mode. " ..
-            "Press M for the map, L for the quest log — each remembers its own size and position.",
+            "Press M for the map, L for the quest log - each remembers its own size and position.",
         features = "Independent scale and position for map and quest log modes. " ..
             "Drag to resize via BazCore handle. " ..
             "Draggable and clamp-to-screen per mode. " ..
             "Replaces Blizzard's fullscreen map with a clean windowed experience.",
         guide = {
             { "Map", "Press M to open the map in a resizable window" },
-            { "Quest Log", "Press L to open the quest log — separate position and size" },
+            { "Quest Log", "Press L to open the quest log - separate position and size" },
             { "Resize", "Drag the handle at the bottom-right corner" },
         },
     })

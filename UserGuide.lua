@@ -6,14 +6,14 @@ if not BazCore or not BazCore.RegisterUserGuide then return end
 
 BazCore:RegisterUserGuide("BazMap", {
     title = "BazMap",
-    intro = "Detaches the World Map from Blizzard's panel system and turns it into a freely resizable, repositionable window — with independent layouts for map mode and quest log mode.",
+    intro = "Detaches the World Map from Blizzard's panel system and turns it into a freely resizable, repositionable window - with independent layouts for map mode and quest log mode.",
     pages = {
         {
             title = "Welcome",
             blocks = {
                 { type = "lead", text = "BazMap reparents the World Map (M) into its own container so it behaves like a normal addon window: drag the edges to resize, drag the title to move, and the rest of your UI doesn't get shoved around when you open it." },
                 { type = "h2", text = "Two layouts in one" },
-                { type = "paragraph", text = "Map mode and quest log mode each remember their own size and position. You can have a large map for exploring zones and a compact quest log for tracking — switching between them no longer resets the other." },
+                { type = "paragraph", text = "Map mode and quest log mode each remember their own size and position. You can have a large map for exploring zones and a compact quest log for tracking - switching between them no longer resets the other." },
             },
         },
         {
@@ -48,8 +48,8 @@ BazCore:RegisterUserGuide("BazMap", {
             blocks = {
                 { type = "paragraph", text = "The world map and quest log have very different ideal sizes:" },
                 { type = "list", items = {
-                    "|cffffd700Map|r is best big and centered — you want to read zone names, see icons, plan routes",
-                    "|cffffd700Quest log|r is best compact and to one side — a reference panel that doesn't dominate the screen",
+                    "|cffffd700Map|r is best big and centered - you want to read zone names, see icons, plan routes",
+                    "|cffffd700Quest log|r is best compact and to one side - a reference panel that doesn't dominate the screen",
                 }},
                 { type = "note", style = "info", text = "With one combined layout, you'd be constantly resizing as you switched. BazMap saves both." },
             },
@@ -57,7 +57,7 @@ BazCore:RegisterUserGuide("BazMap", {
         {
             title = "Profile Support",
             blocks = {
-                { type = "paragraph", text = "Per-character profiles via BazCore — one character can have a giant fullscreen map while another runs a compact corner panel. Switch profiles in the Profiles sub-category." },
+                { type = "paragraph", text = "Per-character profiles via BazCore - one character can have a giant fullscreen map while another runs a compact corner panel. Switch profiles in the Profiles sub-category." },
             },
         },
         {
@@ -68,7 +68,7 @@ BazCore:RegisterUserGuide("BazMap", {
                   rows = {
                       { "/bazmap",       "Open the BazMap settings page" },
                       { "/bazmap reset", "Reset map and quest-log window positions to defaults" },
-                      { "/bmap",         "Alias for /bazmap — every subcommand works on either form" },
+                      { "/bmap",         "Alias for /bazmap - every subcommand works on either form" },
                   },
                 },
             },

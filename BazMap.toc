@@ -1,5 +1,5 @@
 ## Interface: 120005
-## Version: 020
+## Version: 021
 ## Title: BazMap
 ## IconTexture: interface\icons\inv_misc_map_01
 ## Notes: Resizable map and quest log window with independent settings per mode
