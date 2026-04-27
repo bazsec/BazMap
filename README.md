@@ -33,8 +33,8 @@ BazMap detaches the World Map from Blizzard's panel system and turns it into a f
 ## Compatibility
 
 *   **WoW Version:** Retail 12.0 (Midnight)
-*   **Midnight API Safe:** Uses pcall wrapper for UIWidget taint from SetAttribute calls
-*   **Edit Mode:** Compatible - map window is independent of Edit Mode layout
+*   **Taint-safe** — works around Blizzard panel-system quirks that other map addons trip over
+*   **Edit Mode:** Compatible — map window is independent of Edit Mode layout
 
 ***
 
