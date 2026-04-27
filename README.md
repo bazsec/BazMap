@@ -25,6 +25,8 @@ BazMap detaches the World Map from Blizzard's panel system and turns it into a f
 | Command | Description |
 | --- | --- |
 | `/bazmap` | Open settings panel |
+| `/bazmap reset` | Reset map and quest-log window positions to defaults |
+| `/bmap` | Alias for `/bazmap` |
 
 ***
 

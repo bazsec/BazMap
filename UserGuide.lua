@@ -66,7 +66,9 @@ BazCore:RegisterUserGuide("BazMap", {
                 { type = "table",
                   columns = { "Command", "Effect" },
                   rows = {
-                      { "/bazmap", "Open the BazMap settings page" },
+                      { "/bazmap",       "Open the BazMap settings page" },
+                      { "/bazmap reset", "Reset map and quest-log window positions to defaults" },
+                      { "/bmap",         "Alias for /bazmap — every subcommand works on either form" },
                   },
                 },
             },
