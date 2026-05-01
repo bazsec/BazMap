@@ -1,6 +1,5 @@
--- BazMap - A World of Warcraft Addon
+-- SPDX-License-Identifier: GPL-2.0-or-later
 -- Copyright (C) 2025 Baz4k
--- Licensed under GPL v2
 
 local ADDON_NAME = "BazMap"
 
