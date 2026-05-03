@@ -1,5 +1,10 @@
 # BazMap Changelog
 
+## 023 - Fix SetPropagateMouseClicks taint on WorldMap toggle
+- Opening the WorldMap (or any time the data providers refresh — `SUPER_TRACKED_QUEST_CHANGED`, `QUEST_LOG_UPDATE`, etc.) triggered `ADDON_ACTION_BLOCKED` for `Frame:SetPropagateMouseClicks()`. Trace: `ToggleWorldMap` → `AreaPOIDataProvider:RefreshAllData` → `AcquirePin` → `SuperTrackablePinMixin:OnAcquired` → `UpdateMousePropagation` → the protected `SetPropagateMouseClicks` call.
+- Same root cause as the v014 POI-tooltip fix: BazMap's `SetAttribute` calls on `WorldMapFrame` (required to detach the map from Blizzard's panel layout) taint the frame, and that taint propagates to every map pin via the data provider chain. Once tainted, the pin's `SetPropagateMouseClicks` invocation is blocked.
+- Wrapped `SuperTrackablePinMixin:UpdateMousePropagation` in pcall, mirroring the existing `UIWidgetTemplateTextWithStateMixin:Setup` wrap. The protected-call error is swallowed silently. Pins lose correct mouse-pass-through for the affected frame (a click might or might not click through to the map), but the map itself stays fully functional.
+
 ## 014 - Fix POI Tooltip Taint Error
 - Fixed "attempt to perform arithmetic on local 'textHeight' (a secret number value tainted by 'BazMap')" error when hovering Area POIs on the world map
   - Root cause: BazMap's `SetAttribute` calls on WorldMapFrame (required to detach from Blizzard's panel layout system) taint the frame's attribute table; taint then propagates through GameTooltip → UIWidgets → `UIWidgetTemplateTextWithStateMixin:Setup` where `GetStringHeight()` returns a tainted number and `Clamp()` fails on arithmetic

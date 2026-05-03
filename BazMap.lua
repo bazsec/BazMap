@@ -25,6 +25,27 @@ if UIWidgetTemplateTextWithStateMixin and UIWidgetTemplateTextWithStateMixin.Set
 end
 
 ---------------------------------------------------------------------------
+-- Same taint-mitigation pattern for SuperTrackablePinMixin:Update-
+-- MousePropagation, which calls Frame:SetPropagateMouseClicks() - a
+-- protected function. When the user opens the WorldMap (or it
+-- refreshes via QUEST_LOG_UPDATE / SUPER_TRACKED_QUEST_CHANGED / etc.)
+-- Blizzard's data providers iterate every quest / area POI / delve
+-- entrance and Acquire pins; OnAcquired calls UpdateMousePropagation
+-- on each, which hits the taint and BugSack throws ADDON_ACTION_BLOCKED.
+-- Wrapping the call in pcall lets us swallow the protected-call error
+-- silently. The pin loses correct mouse-pass-through behaviour for
+-- that frame (a click on a pin might or might not also click through
+-- to the map), but the map itself stays fully usable, no error spam.
+---------------------------------------------------------------------------
+
+if SuperTrackablePinMixin and SuperTrackablePinMixin.UpdateMousePropagation then
+    local origUpdate = SuperTrackablePinMixin.UpdateMousePropagation
+    SuperTrackablePinMixin.UpdateMousePropagation = function(self)
+        pcall(origUpdate, self)
+    end
+end
+
+---------------------------------------------------------------------------
 -- BazCore Registration
 ---------------------------------------------------------------------------
 
