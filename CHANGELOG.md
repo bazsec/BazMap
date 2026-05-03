@@ -1,5 +1,12 @@
 # BazMap Changelog
 
+## 024 — User guide refresh
+
+In-game User Manual rewritten in a more user-focused tone — the old
+"How It Works" section was internal mechanics talk and has been
+replaced with practical pages on resizing, moving, the two-layout
+design, and profiles.
+
 ## 023 - Fix SetPropagateMouseClicks taint on WorldMap toggle
 - Opening the WorldMap (or any time the data providers refresh — `SUPER_TRACKED_QUEST_CHANGED`, `QUEST_LOG_UPDATE`, etc.) triggered `ADDON_ACTION_BLOCKED` for `Frame:SetPropagateMouseClicks()`. Trace: `ToggleWorldMap` → `AreaPOIDataProvider:RefreshAllData` → `AcquirePin` → `SuperTrackablePinMixin:OnAcquired` → `UpdateMousePropagation` → the protected `SetPropagateMouseClicks` call.
 - Same root cause as the v014 POI-tooltip fix: BazMap's `SetAttribute` calls on `WorldMapFrame` (required to detach the map from Blizzard's panel layout) taint the frame, and that taint propagates to every map pin via the data provider chain. Once tainted, the pin's `SetPropagateMouseClicks` invocation is blocked.
