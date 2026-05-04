@@ -1,5 +1,24 @@
 # BazMap Changelog
 
+## 025 — Quest detail layout + BlizzMove fix
+
+- Clicking a quest in the objective tracker used to open the map at an
+  awkward size with a large empty area at the top. The map opens with the
+  quest's details panel attached, which is neither the regular map view
+  nor the quest log view — BazMap was treating it as one of the other two
+  and getting the layout wrong.
+- The quest detail view is now a third remembered layout. Set its size
+  and position once and it sticks, just like map mode and quest log mode.
+- New "Quest Detail View" section in the BazMap settings page with its
+  own size slider, drag toggle, and reset button.
+- `/bazmap reset` now clears the quest detail position alongside the
+  other two.
+- Fixed BlizzMove conflict: dragging the map could cause the window to
+  jump away from your cursor, especially noticeable when the map was
+  scaled down. BazMap now properly tells BlizzMove to leave the world
+  map alone, using BlizzMove's public API and saving the preference so
+  it sticks across `/reload`.
+
 ## 024 — User guide refresh
 
 In-game User Manual rewritten in a more user-focused tone — the old

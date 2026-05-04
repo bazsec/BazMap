@@ -55,11 +55,13 @@ addon = BazCore:RegisterAddon(ADDON_NAME, {
     savedVariable = "BazMapDB",
     profiles = true,
     defaults = {
-        mapScale       = 100,
-        mapDraggable   = true,
-        questScale     = 100,
-        questDraggable = true,
-        clampToScreen  = true,
+        mapScale        = 100,
+        mapDraggable    = true,
+        questScale      = 100,
+        questDraggable  = true,
+        detailScale     = 100,
+        detailDraggable = true,
+        clampToScreen   = true,
     },
 
     slash = { "/bazmap", "/bmap" },
@@ -69,6 +71,7 @@ addon = BazCore:RegisterAddon(ADDON_NAME, {
             handler = function()
                 addon:SetSetting("mapPosition", nil)
                 addon:SetSetting("questPosition", nil)
+                addon:SetSetting("detailPosition", nil)
                 addon:Print("Positions reset.")
             end,
         },
@@ -82,6 +85,67 @@ addon = BazCore:RegisterAddon(ADDON_NAME, {
 -- addon.db is auto-wired by BazCore:CreateDBProxy() in RegisterAddon
 
 ---------------------------------------------------------------------------
+-- BlizzMove compatibility
+--
+-- BlizzMove registers WorldMapFrame under its own addon namespace (the
+-- BlizzMoveAPI:RegisterFrames call doesn't pass an addOnName, which
+-- defaults to BlizzMove's own self.name = "BlizzMove"). It then attaches
+-- a PanelDragBarTemplate overlay that covers the entire frame and hooks
+-- its own OnMouseDown to a separate StartMoving call. The result is two
+-- competing move systems on the same frame: BazMap's title-bar drag and
+-- BlizzMove's overlay drag both fire on click, and BlizzMove's ignores
+-- BazMap's scale - so the visual jump is proportionally larger the more
+-- BazMap has scaled the frame down.
+--
+-- Old code called BlizzMove:DisableFrame directly with the wrong addon
+-- namespace ("Blizzard_WorldMap" - silently no-op) plus the right one
+-- ("BlizzMove") but no persistence. We now use the public BlizzMoveAPI
+-- with permanent=true so the disable survives /reload, and call it from
+-- multiple entry points to win whichever load-order race happens.
+---------------------------------------------------------------------------
+
+local blizzMoveDisabled = false
+
+local function DisableBlizzMoveWorldMap()
+    if blizzMoveDisabled then return end
+    if not (BlizzMoveAPI or BlizzMove) then return end
+
+    -- Public API path. UnregisterFrame with addOnName=nil falls through
+    -- to BlizzMove.name internally, matching how the frame was originally
+    -- registered. permanent=true persists to BlizzMove's SV so a later
+    -- session doesn't re-acquire the conflict. UnprocessFrame inside
+    -- recurses through SubFrames, so this single call also covers
+    -- QuestMapFrame and the rewards/scroll sub-frames.
+    if BlizzMoveAPI and BlizzMoveAPI.UnregisterFrame then
+        local ok = pcall(BlizzMoveAPI.UnregisterFrame, BlizzMoveAPI, nil, "WorldMapFrame", true)
+        if ok then blizzMoveDisabled = true end
+    end
+
+    -- Legacy fallback for very old BlizzMove builds without the API.
+    if not blizzMoveDisabled and BlizzMove and BlizzMove.DisableFrame then
+        pcall(BlizzMove.DisableFrame, BlizzMove, "BlizzMove", "WorldMapFrame")
+        blizzMoveDisabled = true
+    end
+end
+
+-- Attempt 1: file scope, in case BlizzMove is already loaded when BazMap
+-- loads (common since both are typically loaded at login).
+DisableBlizzMoveWorldMap()
+
+-- Attempt 2: BlizzMove ADDON_LOADED, in case BlizzMove loads after
+-- BazMap. Covers the rarer load order. The helper is idempotent.
+local blizzMoveWatch = CreateFrame("Frame")
+blizzMoveWatch:RegisterEvent("ADDON_LOADED")
+blizzMoveWatch:SetScript("OnEvent", function(self, _, loadedAddon)
+    if loadedAddon == "BlizzMove" then
+        DisableBlizzMoveWorldMap()
+        if blizzMoveDisabled then
+            self:UnregisterEvent("ADDON_LOADED")
+        end
+    end
+end)
+
+---------------------------------------------------------------------------
 -- State
 ---------------------------------------------------------------------------
 
@@ -89,17 +153,62 @@ local initialized = false
 
 ---------------------------------------------------------------------------
 -- Mode detection
+--
+-- The World Map shows up in three distinct shapes depending on what the
+-- player is doing, all sharing the same WorldMapFrame:
+--
+--   "map"    - M key, full map only, no side panel
+--   "quest"  - L key, map + quest log list down the side
+--   "detail" - clicking a tracked quest in the objective tracker (or any
+--              other path that funnels through QuestMapFrame_ShowQuest-
+--              Details), map + quest detail panel down the side
+--
+-- The detail mode is a third state that the addon used to collapse into
+-- "quest" because it only checked QuestMapFrame:IsShown(). Result: clicking
+-- a tracked quest applied quest-log-mode size/position to a frame whose
+-- internal layout was the larger detail view, leaving a big empty area
+-- inside the window. Probing DetailsFrame.questID (via the public helper
+-- QuestMapFrame_GetDetailQuestID) tells us cleanly which sub-state we're
+-- actually in.
 ---------------------------------------------------------------------------
 
 local lastKnownMode = "map"
 
-local function GetCurrentMode()
-    if QuestMapFrame and QuestMapFrame:IsShown() then
-        lastKnownMode = "quest"
-        return "quest"
+local function IsDetailQuestActive()
+    if QuestMapFrame_GetDetailQuestID then
+        return QuestMapFrame_GetDetailQuestID() ~= nil
     end
-    lastKnownMode = "map"
-    return "map"
+    if QuestMapFrame and QuestMapFrame.DetailsFrame then
+        return QuestMapFrame.DetailsFrame:IsShown()
+            and QuestMapFrame.DetailsFrame.questID ~= nil
+    end
+    return false
+end
+
+local function GetCurrentMode()
+    if not QuestMapFrame or not QuestMapFrame:IsShown() then
+        lastKnownMode = "map"
+        return "map"
+    end
+    if IsDetailQuestActive() then
+        lastKnownMode = "detail"
+        return "detail"
+    end
+    lastKnownMode = "quest"
+    return "quest"
+end
+
+-- ProbeMode is GetCurrentMode without the lastKnownMode side effect. Used
+-- by the transition guards to compare "what mode are we becoming?" against
+-- "what mode were we?" so we only do save+apply work on real transitions,
+-- not on every cascade hook fire (clicking a tracked quest fires the
+-- WorldMapFrame:Show, QuestMapFrame:Show, and ShowQuestDetails hooks all
+-- in one tick - without this guard we'd save+load three times and the
+-- intermediate states can persist if anything races).
+local function ProbeMode()
+    if not QuestMapFrame or not QuestMapFrame:IsShown() then return "map" end
+    if IsDetailQuestActive() then return "detail" end
+    return "quest"
 end
 
 local function GetModeKey(suffix)
@@ -135,10 +244,14 @@ function addon:LoadPosition()
     local pos = addon:GetSetting(GetModeKey("Position"))
     if GetModeDraggable() and pos then
         WorldMapFrame:SetPoint(pos.point, UIParent, pos.relativePoint, pos.x, pos.y)
-    elseif GetCurrentMode() == "quest" then
-        WorldMapFrame:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
     else
-        WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        local mode = GetCurrentMode()
+        if mode == "quest" then
+            WorldMapFrame:SetPoint("LEFT", UIParent, "LEFT", 0, 0)
+        else
+            -- "map" and "detail" both render the full map - centre is sensible
+            WorldMapFrame:SetPoint("CENTER", UIParent, "CENTER", 0, 0)
+        end
     end
 end
 
@@ -191,8 +304,19 @@ end
 -- Apply all settings
 ---------------------------------------------------------------------------
 
+-- Drag state flag (toggled by titleBar OnMouseDown/OnMouseUp). Used by
+-- ApplyAll to skip its ClearAllPoints+SetPoint while the user is mid-
+-- drag - otherwise any caller that fires ApplyAll mid-drag (Blizzard's
+-- SynchronizeDisplayState refresh, a stale BlizzMove handler, an
+-- OnSizeChanged) teleports the frame and the user ends up holding a
+-- different part of the window. WorldMapFrame doesn't expose
+-- IsMovingOrSizing on its class so we can't query the engine flag
+-- directly - hence this manual marker.
+local isDragging = false
+
 function addon:ApplyAll()
     if not WorldMapFrame or not WorldMapFrame:IsShown() then return end
+    if isDragging then return end
     self:ApplyScale()
     self:LoadPosition()
     WorldMapFrame:SetMovable(GetModeDraggable())
@@ -245,12 +369,14 @@ local function InitMap()
     if titleBar then
         titleBar:HookScript("OnMouseDown", function(_, button)
             if button == "LeftButton" and GetModeDraggable() then
+                isDragging = true
                 WorldMapFrame:StartMoving()
             end
         end)
         titleBar:HookScript("OnMouseUp", function(_, button)
             if button == "LeftButton" and GetModeDraggable() then
                 WorldMapFrame:StopMovingOrSizing()
+                isDragging = false
                 addon:SavePosition()
             end
         end)
@@ -273,22 +399,51 @@ local function InitMap()
         addon:SavePosition()
     end)
 
-    -- Mode changes while open
+    -- Mode-change handler: shared by every hook that can flip the mode
+    -- (QuestMapFrame Show/Hide for M<->L, and the three quest-detail
+    -- globals for L<->detail and entry into detail from the objective
+    -- tracker click path).
+    --
+    -- The mode-change guard is essential. Clicking a tracked quest
+    -- fires WorldMapFrame:Show, QuestMapFrame:Show, and
+    -- QuestMapFrame_ShowQuestDetails all in the same tick. Without the
+    -- guard we'd save+apply three times, and any intermediate state
+    -- that races with another caller (BlizzMove, an OnUpdate, the
+    -- title-bar drag's mouse handlers) can persist a wrong save into
+    -- the wrong mode's slot. Result: "the log opens in a different
+    -- place than last time." The guard short-circuits no-op calls so
+    -- only one real transition does work per cascade.
+    --
+    -- Order: SavePosition first (uses lastKnownMode = OLD mode), then
+    -- ApplyAll (its GetCurrentMode call updates lastKnownMode to NEW).
+    local function HandleModeChange()
+        if not WorldMapFrame or not WorldMapFrame:IsShown() then return end
+        local newMode = ProbeMode()
+        if newMode == lastKnownMode then return end
+        addon:SavePosition()
+        addon:ApplyAll()
+    end
+
     if QuestMapFrame then
-        hooksecurefunc(QuestMapFrame, "Show", function()
-            if WorldMapFrame:IsShown() then
-                lastKnownMode = "quest"
-                addon:ApplyAll()
-            end
-        end)
-        hooksecurefunc(QuestMapFrame, "Hide", function()
-            if WorldMapFrame:IsShown() then
-                -- Save quest position before switching to map mode
-                addon:SavePosition()
-                lastKnownMode = "map"
-                addon:ApplyAll()
-            end
-        end)
+        hooksecurefunc(QuestMapFrame, "Show", HandleModeChange)
+        hooksecurefunc(QuestMapFrame, "Hide", HandleModeChange)
+    end
+
+    -- Quest detail transitions: clicking a tracked quest in the
+    -- objective tracker, hitting Back on the detail panel, ESC, or
+    -- super-tracking a different quest all funnel through these three
+    -- globals. Hooking them covers every Blizzard entry point that can
+    -- enter or leave the map+detail hybrid view (objective tracker
+    -- click, side-panel quest list click, Adventure Journal "View in
+    -- Quest Log", etc.) without chasing each caller individually.
+    if QuestMapFrame_ShowQuestDetails then
+        hooksecurefunc("QuestMapFrame_ShowQuestDetails", HandleModeChange)
+    end
+    if QuestMapFrame_CloseQuestDetails then
+        hooksecurefunc("QuestMapFrame_CloseQuestDetails", HandleModeChange)
+    end
+    if QuestMapFrame_ReturnFromQuestDetails then
+        hooksecurefunc("QuestMapFrame_ReturnFromQuestDetails", HandleModeChange)
     end
 
     -- Resize handle (via BazCore)
@@ -306,15 +461,11 @@ local function InitMap()
         if WorldMapFrame:IsShown() then addon:ApplyScale() end
     end)
 
-    -- BlizzMove compatibility
-    if C_AddOns.IsAddOnLoaded("BlizzMove") then
-        C_Timer.After(0.5, function()
-            if BlizzMove and BlizzMove.DisableFrame then
-                pcall(function() BlizzMove:DisableFrame("Blizzard_WorldMap", "WorldMapFrame") end)
-                pcall(function() BlizzMove:DisableFrame("BlizzMove", "WorldMapFrame") end)
-            end
-        end)
-    end
+    -- BlizzMove compatibility (see DisableBlizzMoveWorldMap below).
+    -- This is a belt-and-suspenders call alongside the file-scope and
+    -- BlizzMove-ADDON_LOADED attempts; the helper short-circuits if it
+    -- has already disabled successfully.
+    DisableBlizzMoveWorldMap()
 end
 
 ---------------------------------------------------------------------------
@@ -346,15 +497,16 @@ end
 local function GetLandingPage()
     return BazCore:CreateLandingPage("BazMap", {
         subtitle = "Resizable map and quest log",
-        description = "A resizable map and quest log window with independent settings per mode. " ..
-            "Press M for the map, L for the quest log - each remembers its own size and position.",
-        features = "Independent scale and position for map and quest log modes. " ..
+        description = "A resizable map and quest log window with independent settings for each view. " ..
+            "Press M for the map, L for the quest log, or click a tracked quest to bring up the quest detail view - each remembers its own size and position.",
+        features = "Independent scale and position for map, quest log, and quest detail views. " ..
             "Drag to resize via BazCore handle. " ..
             "Draggable and clamp-to-screen per mode. " ..
             "Replaces Blizzard's fullscreen map with a clean windowed experience.",
         guide = {
             { "Map", "Press M to open the map in a resizable window" },
             { "Quest Log", "Press L to open the quest log - separate position and size" },
+            { "Quest Detail", "Click a tracked quest to read its full details - own size and position" },
             { "Resize", "Drag the handle at the bottom-right corner" },
         },
     })
@@ -368,7 +520,7 @@ local function GetSettingsPage()
             intro = {
                 order = 0.1,
                 type = "lead",
-                text = "Map mode and quest log mode each save their own size and position. Adjust the two layouts independently below.",
+                text = "Map mode, quest log mode, and quest detail view each save their own size and position. Adjust the three layouts independently below.",
             },
             mapHeader = {
                 order = 1,
@@ -465,6 +617,56 @@ local function GetSettingsPage()
                         addon:LoadPosition()
                     end
                     addon:Print("Quest log position reset.")
+                end,
+            },
+
+            detailHeader = {
+                order = 20,
+                type = "header",
+                name = "Quest Detail View",
+            },
+            detailIntro = {
+                order = 20.5,
+                type = "description",
+                name = "Clicking a quest in the objective tracker opens the map with the quest's details panel attached. This view sits between map and quest log mode and remembers its own size and position.",
+                fontSize = "small",
+            },
+            detailScale = {
+                order = 21,
+                type = "range",
+                name = "Quest Detail Size",
+                min = 30, max = 150, step = 5,
+                get = function() return addon:GetSetting("detailScale") or 100 end,
+                set = function(_, val)
+                    addon:SetSetting("detailScale", val)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "detail" then
+                        addon:ApplyScale()
+                    end
+                end,
+            },
+            detailDraggable = {
+                order = 22,
+                type = "toggle",
+                name = "Enable Dragging (Quest Detail)",
+                get = function() return addon:GetSetting("detailDraggable") ~= false end,
+                set = function(_, val)
+                    addon:SetSetting("detailDraggable", val)
+                    if WorldMapFrame and GetCurrentMode() == "detail" then
+                        WorldMapFrame:SetMovable(val)
+                        if not val then addon:LoadPosition() end
+                    end
+                end,
+            },
+            resetDetail = {
+                order = 23,
+                type = "execute",
+                name = "Reset Quest Detail Position",
+                func = function()
+                    addon:SetSetting("detailPosition", nil)
+                    if WorldMapFrame and WorldMapFrame:IsShown() and GetCurrentMode() == "detail" then
+                        addon:LoadPosition()
+                    end
+                    addon:Print("Quest detail position reset.")
                 end,
             },
         },
