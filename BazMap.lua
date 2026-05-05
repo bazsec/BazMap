@@ -46,6 +46,25 @@ if SuperTrackablePinMixin and SuperTrackablePinMixin.UpdateMousePropagation then
 end
 
 ---------------------------------------------------------------------------
+-- And the MapCanvasPinMixin:CheckMouseButtonPassthrough path. When the
+-- world map closes, Blizzard's UIPanelPanelManager fires a hide cascade
+-- that re-acquires every quest pin via QuestDataProvider:AddQuest, and
+-- AcquirePin calls CheckMouseButtonPassthrough on the new pin. That
+-- method calls SetPassThroughButtons() directly, which is protected -
+-- so once the WorldMapFrame's attribute table is tainted, the call is
+-- blocked and BugSack catches an ADDON_ACTION_BLOCKED. Same pcall
+-- shim swallows it: the pin loses correct passthrough behaviour for
+-- that one frame, but the map closes cleanly with no error.
+---------------------------------------------------------------------------
+
+if MapCanvasPinMixin and MapCanvasPinMixin.CheckMouseButtonPassthrough then
+    local origCheck = MapCanvasPinMixin.CheckMouseButtonPassthrough
+    MapCanvasPinMixin.CheckMouseButtonPassthrough = function(self, ...)
+        pcall(origCheck, self, ...)
+    end
+end
+
+---------------------------------------------------------------------------
 -- BazCore Registration
 ---------------------------------------------------------------------------
 
